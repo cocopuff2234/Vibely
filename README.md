@@ -1,1 +1,2 @@
+# Vibely
 AI-powered learning tool that ensures you learn as you vibecode, not just copy and paste. Actively monitors your coding sessions and engages you in intelligent check-ins to reinforce learning, turning passive coding into an interactive learning experience.
