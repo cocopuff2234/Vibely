@@ -50,7 +50,7 @@ function getWebviewContent(): string {
 		<head>
 			<meta charset="UTF-8">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<title>AI Code Generator</title>
+			<title>Vibely</title>
 		</head>
 		<body>
 			<h2>Enter your prompt:</h2>
