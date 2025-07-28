@@ -12,7 +12,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const disposable = vscode.commands.registerCommand('vibely.helloWorld', () => {
 		const panel = vscode.window.createWebviewPanel(
 			'codePrompt',
-			'AI Code Generator',
+			'Vibely',
 			vscode.ViewColumn.One,
 			{
 				enableScripts: true
@@ -58,11 +58,6 @@ function getWebviewContent(): string {
 				padding: 20px;
 				color: #ddd;
 			}
-			h2 {
-				text-align: center;
-				color: #c586c0;
-				font-size: 2rem;
-			}
 			textarea {
 				width: 100%;
 				padding: 10px;
@@ -106,10 +101,80 @@ function getWebviewContent(): string {
 				color: #999;
 				margin-top: 8px;
 			}
+			.loading-dots {
+				display: inline-block;
+				text-align: center;
+				width: 100%;
+				margin-top: 20px;
+			}
+			.loading-dots span {
+				display: inline-block;
+				width: 8px;
+				height: 8px;
+				margin: 0 4px;
+				background-color: #c586c0;
+				border-radius: 50%;
+				animation: blink 1.4s infinite both;
+			}
+			.loading-dots span:nth-child(2) {
+				animation-delay: 0.2s;
+			}
+			.loading-dots span:nth-child(3) {
+				animation-delay: 0.4s;
+			}
+			@keyframes blink {
+				0%, 80%, 100% {
+					opacity: 0;
+				}
+				40% {
+					opacity: 1;
+				}
+			}
+			.text {
+				color: #c586c0;
+				font-weight: bolder;
+				text-align: center;
+				font-size: 2rem;
+			}
+
+			@keyframes letter-once {
+				0% {
+					font-size: 2rem;
+				}
+
+				50% {
+					font-size: 2.6rem;
+				}
+
+				100% {
+					font-size: 2rem;
+				}
+			}
+
+			.letter {
+				display: inline-block;
+				animation: letter-once 1s ease-in-out forwards;
+			}
+
+			.letter1 { animation-delay: 0s; }
+			.letter2 { animation-delay: 0.1s; }
+			.letter3 { animation-delay: 0.2s; }
+			.letter4 { animation-delay: 0.3s; }
+			.letter5 { animation-delay: 0.4s; }
+			.letter6 { animation-delay: 0.5s; }
 		</style>
 	</head>
 	<body>
-		<h2>Vibely</h2>
+		<div class="loader">
+			<p class="text">
+				<span class="letter letter1">V</span>
+				<span class="letter letter2">i</span>
+				<span class="letter letter3">b</span>
+				<span class="letter letter4">e</span>
+				<span class="letter letter5">l</span>
+				<span class="letter letter6">y</span>
+			</p>
+		</div>
 		<textarea id="prompt" rows="5" placeholder="e.g., Write a Python function that sorts a list by frequency..."></textarea><br>
 		<div style="text-align: center;">
 			<button onclick="sendPrompt()">Generate</button>
@@ -119,10 +184,19 @@ function getWebviewContent(): string {
 		<script>
 			const vscode = acquireVsCodeApi();
 
+			function escapeHtml(str) {
+				return str
+					.replace(/&/g, "&amp;")
+					.replace(/</g, "&lt;")
+					.replace(/>/g, "&gt;")
+					.replace(/"/g, "&quot;")
+					.replace(/'/g, "&#039;");
+			}
+
 			function sendPrompt() {
 				const prompt = document.getElementById('prompt').value;
 				const responseContainer = document.getElementById('response');
-				responseContainer.innerHTML = '<p>Generating comprehension questions...</p>';
+				responseContainer.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
 				vscode.postMessage({ type: 'prompt', value: prompt });
 			}
 
@@ -134,10 +208,10 @@ function getWebviewContent(): string {
 						if (data.questions) {
 							renderQuestions(data.questions);
 						} else {
-							document.getElementById('response').textContent = message.value;
+							document.getElementById('response').innerHTML = '<pre><code>' + escapeHtml(message.value) + '</code></pre>';
 						}
 					} catch (e) {
-						document.getElementById('response').textContent = message.value;
+						document.getElementById('response').innerHTML = '<pre><code>' + escapeHtml(message.value) + '</code></pre>';
 					}
 				}
 			});
