@@ -135,6 +135,7 @@ function getWebviewContent(): string {
 				font-weight: bolder;
 				text-align: center;
 				font-size: 2rem;
+				letter-spacing: -2.5px;
 			}
 
 			@keyframes letter-once {
@@ -162,6 +163,49 @@ function getWebviewContent(): string {
 			.letter4 { animation-delay: 0.3s; }
 			.letter5 { animation-delay: 0.4s; }
 			.letter6 { animation-delay: 0.5s; }
+
+			.loader-text {
+				font-size: 1rem;
+				font-weight: 500;
+				background: linear-gradient(to right, #ccc, #ccc);
+				-webkit-background-clip: text;
+				-webkit-text-fill-color: transparent;
+				white-space: nowrap;
+				overflow: hidden;
+			}
+
+			#placeholder-animator {
+				position: absolute;
+				top: 10px;
+				left: 12px;
+				pointer-events: none;
+				color: #888;
+				opacity: 0.6;
+				max-width: calc(100% - 24px);
+				overflow-wrap: break-word;
+				white-space: normal;
+				word-break: break-word;
+			}
+
+			@keyframes typewriter {
+				0% {
+					width: 0px;
+				}
+
+				100% {
+					width: 240px;
+				}
+			}
+
+			@keyframes blink {
+				0% {
+					border-right-color: rgba(255,255,255,.75);
+				}
+
+				100% {
+					border-right-color: transparent;
+				}
+			}
 		</style>
 	</head>
 	<body>
@@ -175,7 +219,10 @@ function getWebviewContent(): string {
 				<span class="letter letter6">y</span>
 			</p>
 		</div>
-		<textarea id="prompt" rows="5" placeholder="e.g., Write a Python function that sorts a list by frequency..."></textarea><br>
+		<div style="position: relative;">
+			<textarea id="prompt" rows="5"></textarea>
+			<div id="placeholder-animator" class="loader-text" style="position: absolute; top: 10px; left: 12px; pointer-events: none; color: #888;"></div>
+		</div><br>
 		<div style="text-align: center;">
 			<button onclick="sendPrompt()">Generate</button>
 		</div>
@@ -238,6 +285,61 @@ function getWebviewContent(): string {
 					container.appendChild(wrapper);
 				});
 			}
+
+			const placeholderAnimator = document.getElementById('placeholder-animator');
+			const promptInput = document.getElementById('prompt');
+
+			const examples = [
+				"Write a Python function that returns the most frequent element.",
+				"Build me a landing page for my restaurant.",
+				"Fix my code."
+			];
+			let exampleIndex = 0;
+			let charIndex = 0;
+
+			function typeWriter() {
+				let typing = true;
+
+				function type() {
+					if (promptInput.value.length > 0) {
+						placeholderAnimator.innerText = '';
+						return;
+					}
+
+					if (typing) {
+						if (charIndex <= examples[exampleIndex].length) {
+							placeholderAnimator.innerText = examples[exampleIndex].substring(0, charIndex);
+							charIndex++;
+							setTimeout(type, 40);
+						} else {
+							typing = false;
+							setTimeout(type, 1000);
+						}
+					} else {
+						if (charIndex > 0) {
+							charIndex--;
+							placeholderAnimator.innerText = examples[exampleIndex].substring(0, charIndex);
+							setTimeout(type, 25);
+						} else {
+							typing = true;
+							exampleIndex = (exampleIndex + 1) % examples.length;
+							setTimeout(type, 250);
+						}
+					}
+				}
+
+				type();
+			}
+
+			promptInput.addEventListener('input', () => {
+				if (promptInput.value.length > 0) {
+					placeholderAnimator.innerText = '';
+				} else {
+					typeWriter();
+				}
+			});
+
+			typeWriter();
 		</script>
 	</body>
 	</html>
