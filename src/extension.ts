@@ -89,10 +89,19 @@ export function activate(context: vscode.ExtensionContext) {
 				else if (message.type === 'checkSimilarity') {
 					const { id, userAnswer, correctAnswer } = message;
 					const similarityPrompt = `
-The following is a student's answer to a coding comprehension question. Determine if the answer is correct in meaning, even if it is not worded exactly the same. Respond only with "correct" or "incorrect".
+You are a helpful assistant evaluating short free-response answers. Determine whether the user's answer is **conceptually accurate** based on the reference answer.
 
-Question: ${correctAnswer}
-Student Answer: ${userAnswer}
+Be lenient with phrasing. Accept minor omissions or simplifications as long as the key concept is present.
+
+Only reject if the user's answer is clearly wrong or unrelated.
+
+Reference Answer:
+"${correctAnswer}"
+
+User Response:
+"${userAnswer}"
+
+Respond with one word only: "correct" or "incorrect".
 `;
 					try {
 						const result = await callOpenAI(similarityPrompt);
@@ -384,7 +393,7 @@ function getWebviewContent(): string {
 				return matches / len;
 			}
 
-			function handleSubmit(id, correctIndex, explanation, type, button) {
+			async function handleSubmit(id, correctIndex, explanation, type, button) {
 				const wrapper = button.closest('.question');
 				const feedback = document.getElementById('feedback-' + id);
 				let isCorrect = false;
@@ -395,16 +404,23 @@ function getWebviewContent(): string {
 						isCorrect = true;
 					}
 				} else if (type === 'free-response') {
-					const val = document.getElementById('input-' + id).value.trim().toLowerCase();
-					const correct = (window.currentData?.questions.find(q => q.id === id)?.answer?.toLowerCase().trim() || '');
-					const similarity = getSimilarity(val, correct);
-					if (
-						similarity > 0.7 ||
-						correct.includes(val) ||
-						val.includes(correct)
-					) {
-						isCorrect = true;
-					}
+					const val = document.getElementById('input-' + id).value.trim();
+					const correct = window.currentData?.questions.find(q => q.id === id)?.answer || '';
+
+					feedback.innerText = '⏳ Checking answer...';
+
+					const isCorrectResponse = await new Promise((resolve) => {
+						const listener = (event) => {
+							if (event.data.type === 'similarityResult' && event.data.id === id) {
+								window.removeEventListener('message', listener);
+								resolve(event.data.isSimilar);
+							}
+						};
+						window.addEventListener('message', listener);
+						vscode.postMessage({ type: 'checkSimilarity', id, userAnswer: val, correctAnswer: correct });
+					});
+
+					isCorrect = isCorrectResponse === true;
 				}
 
 				let attempts = parseInt(wrapper.dataset.attempts || '0');
