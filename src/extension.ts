@@ -21,16 +21,14 @@ async function callOpenAI(prompt: string): Promise<string> {
 
 2. "questions": An array of objects representing comprehension questions. Each object must include:
    - id: unique string like "q1", "q2"
-   - type: either "multiple-choice" or "free-response"
+   - type: always "multiple-choice"
    - text: the actual question
-   - options: (required if type is "multiple-choice") array of 3–5 answer choices
-   - correct_answer_index: (for multiple-choice) the 0-based index of the correct answer
-   - answer: (for free-response) a short phrase or sentence that captures the expected answer
+   - options: array of 3–5 answer choices
+   - correct_answer_index: the 0-based index of the correct answer
    - explanation: a short explanation for why the answer is correct
 
-The "answer" field for free-response should not require exact string matching. It should be concise but descriptive enough that similar answers can be considered correct using partial string matching or similarity scoring.
-
 Always include all questions in the "questions" array.
+The "questions" array MUST contain between 3 and 5 multiple-choice questions, no more, no less. Each must be of "type": "multiple-choice". Follow the schema as described, with options, correct_answer_index, and explanation included for each.
 
 Respond ONLY with the JSON object and no extra commentary. Do not include markdown surrounding the JSON.
 `
@@ -84,31 +82,6 @@ export function activate(context: vscode.ExtensionContext) {
 						panel.webview.postMessage({ type: 'response', value: aiResponse });
 					} catch (e: any) {
 						panel.webview.postMessage({ type: 'response', value: 'Error: ' + e.message });
-					}
-				}
-				else if (message.type === 'checkSimilarity') {
-					const { id, userAnswer, correctAnswer } = message;
-					const similarityPrompt = `
-You are a helpful assistant evaluating short free-response answers. Determine whether the user's answer is **conceptually accurate** based on the reference answer.
-
-Be lenient with phrasing. Accept minor omissions or simplifications as long as the key concept is present.
-
-Only reject if the user's answer is clearly wrong or unrelated.
-
-Reference Answer:
-"${correctAnswer}"
-
-User Response:
-"${userAnswer}"
-
-Respond with one word only: "correct" or "incorrect".
-`;
-					try {
-						const result = await callOpenAI(similarityPrompt);
-						const isSimilar = result.trim().toLowerCase() === 'correct';
-						panel.webview.postMessage({ type: 'similarityResult', id, isSimilar });
-					} catch (err) {
-						panel.webview.postMessage({ type: 'similarityResult', id, isSimilar: false });
 					}
 				}
 			},
@@ -352,15 +325,12 @@ function getWebviewContent(): string {
 					wrapper.dataset.attempts = '0';
 
 					let inputHtml = '';
-					if (q.type === 'multiple-choice') {
-						inputHtml = q.options.map((opt, i) => \`
-							<label style="display: block; margin: 4px 0;">
-								<input type="radio" name="q-\${q.id}" value="\${i}"> \${opt}
-							</label>
-						\`).join('');
-					} else if (q.type === 'free-response') {
-						inputHtml = \`<textarea rows="2" style="width: 100%; margin-top: 5px;" id="input-\${q.id}"></textarea>\`;
-					}
+					// Always render multiple-choice since only that type is used
+					inputHtml = q.options.map((opt, i) => \`
+						<label style="display: block; margin: 4px 0;">
+							<input type="radio" name="q-\${q.id}" value="\${i}"> \${opt}
+						</label>
+					\`).join('');
 
 					wrapper.innerHTML = \`
 						<p><strong>Q\${index + 1}: \${q.text}</strong></p>
@@ -398,29 +368,10 @@ function getWebviewContent(): string {
 				const feedback = document.getElementById('feedback-' + id);
 				let isCorrect = false;
 
-				if (type === 'multiple-choice') {
-					const selected = document.querySelector(\`input[name="q-\${id}"]:checked\`);
-					if (selected && parseInt(selected.value) === correctIndex) {
-						isCorrect = true;
-					}
-				} else if (type === 'free-response') {
-					const val = document.getElementById('input-' + id).value.trim();
-					const correct = window.currentData?.questions.find(q => q.id === id)?.answer || '';
-
-					feedback.innerText = '⏳ Checking answer...';
-
-					const isCorrectResponse = await new Promise((resolve) => {
-						const listener = (event) => {
-							if (event.data.type === 'similarityResult' && event.data.id === id) {
-								window.removeEventListener('message', listener);
-								resolve(event.data.isSimilar);
-							}
-						};
-						window.addEventListener('message', listener);
-						vscode.postMessage({ type: 'checkSimilarity', id, userAnswer: val, correctAnswer: correct });
-					});
-
-					isCorrect = isCorrectResponse === true;
+				// Only handle multiple-choice questions
+				const selected = document.querySelector(\`input[name="q-\${id}"]:checked\`);
+				if (selected && parseInt(selected.value) === correctIndex) {
+					isCorrect = true;
 				}
 
 				let attempts = parseInt(wrapper.dataset.attempts || '0');
@@ -533,15 +484,12 @@ function getWebviewContent(): string {
 					wrapper.dataset.attempts = '0';
 
 					let inputHtml = '';
-					if (q.type === 'multiple-choice') {
-						inputHtml = q.options.map((opt, i) => \`
-							<label style="display: block; margin: 4px 0;">
-								<input type="radio" name="q-\${q.id}" value="\${i}"> \${opt}
-							</label>
-						\`).join('');
-					} else if (q.type === 'free-response') {
-						inputHtml = \`<textarea rows="2" style="width: 100%; margin-top: 5px;" id="input-\${q.id}"></textarea>\`;
-					}
+					// Always render multiple-choice since only that type is used
+					inputHtml = q.options.map((opt, i) => \`
+						<label style="display: block; margin: 4px 0;">
+							<input type="radio" name="q-\${q.id}" value="\${i}"> \${opt}
+						</label>
+					\`).join('');
 
 					wrapper.innerHTML = \`
 						<p><strong>Q\${index + 1}: \${q.text}</strong></p>
