@@ -79,7 +79,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 					try {
 						const aiResponse = await callOpenAI(userPrompt);
-						panel.webview.postMessage({ type: 'response', value: aiResponse });
+						panel.webview.postMessage({ type: 'response', value: aiResponse }); //ai Response is the string that we need to send back to AI for comparison with user answer
 					} catch (e: any) {
 						panel.webview.postMessage({ type: 'response', value: 'Error: ' + e.message });
 					}
@@ -286,8 +286,9 @@ function getWebviewContent(): string {
 				const prompt = document.getElementById('prompt').value;
 				const responseContainer = document.getElementById('response');
 				responseContainer.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div>';
-				vscode.postMessage({ type: 'prompt', value: prompt });
+				vscode.postMessage({ type: 'prompt', value: prompt }); //vscode.postMessage value is the user prompt that needs to be compared against the ai response for the correct answer
 			}
+				//basically it seems that we need to hardcode the beginning of our response prompt with: "Is this answer {user reponse} close to the expected answer of question {user first query}?"
 
 			window.addEventListener('message', event => {
 				const message = event.data;
@@ -295,7 +296,7 @@ function getWebviewContent(): string {
 					try {
 						const data = JSON.parse(message.value);
 						if (data.questions) {
-							renderQuestions(data);
+							renderQuestions(data); //what is data here? is it user reponse? should be ?
 						} else {
 							document.getElementById('response').innerHTML = '<pre><code style="font-family: monospace; background-color: #2d2d2d; display: block; padding: 1rem; border-radius: 8px; color: #fff;">' + escapeHtml(message.value) + '</code></pre>';
 						}
@@ -305,84 +306,44 @@ function getWebviewContent(): string {
 				}
 			});
 
-			function renderQuestions(data) {
-				const container = document.getElementById('response');
-				container.innerHTML = '';
-
-				const codeBlock = document.createElement('pre');
-				codeBlock.innerHTML = '<code style="font-family: monospace; background-color: #2d2d2d; display: block; padding: 1rem; border-radius: 8px; color: #fff;">' + escapeHtml(data.code || '') + '</code>';
-				container.appendChild(codeBlock);
-
-				let correctCount = 0;
-
-				data.questions.forEach((q, index) => {
-					const wrapper = document.createElement('div');
-					wrapper.className = 'question';
-					wrapper.style.border = '1px solid #555';
-					wrapper.style.padding = '10px';
-					wrapper.style.marginTop = '15px';
-					wrapper.style.borderRadius = '6px';
-					wrapper.dataset.attempts = '0';
-
-					let inputHtml = '';
-					// Always render multiple-choice since only that type is used
-					inputHtml = q.options.map((opt, i) => \`
-						<label style="display: block; margin: 4px 0;">
-							<input type="radio" name="q-\${q.id}" value="\${i}"> \${opt}
-						</label>
-					\`).join('');
-
-					wrapper.innerHTML = \`
-						<p><strong>Q\${index + 1}: \${q.text}</strong></p>
-						<div>\${inputHtml}</div>
-						<button onclick="handleSubmit('\${q.id}', \${q.correct_answer_index ?? -1}, '\${escapeHtml(q.explanation)}', '\${q.type}', this)">Submit</button>
-						<p class="feedback" id="feedback-\${q.id}"></p>
-						<button style="display: none;" onclick="showHint('\${q.id}', '\${escapeHtml(q.explanation)}')" id="hint-\${q.id}">Show Hint</button>
-					\`;
-
-					container.appendChild(wrapper);
-				});
-
-				// Reveal final implementation button if all are correct
-				const congratsBtn = document.createElement('button');
-				congratsBtn.textContent = "🎉 Congrats! Want to implement this code?";
-				congratsBtn.style.marginTop = '20px';
-				congratsBtn.style.display = 'none';
-				congratsBtn.onclick = () => vscode.postMessage({ type: 'implement', value: data.code });
-				congratsBtn.id = "congrats-button";
-				container.appendChild(congratsBtn);
-			}
-
-			function getSimilarity(a, b) {
-				if (!a || !b) return 0;
+			/JUNK TODO
+			function getSimilarity(a, b) { //TODO: this function currently unused, and it just compares 
+				if (!a || !b) return 0; //wtf is going on here
 				let matches = 0;
-				const len = Math.max(a.length, b.length);
-				for (let i = 0; i < Math.min(a.length, b.length); i++) {
-					if (a[i] === b[i]) matches++;
+				const len = Math.max(a.length, b.length); // length = longer of the two
+				for (let i = 0; i < Math.min(a.length, b.length); i++) { //if iteratore is less than shorter of the two
+					if (a[i] === b[i]) matches++; //if the characters match then increase matches
 				}
-				return matches / len;
+				return matches / len; //return the matches divided by the length of the longer string
 			}
 
+			//we want to know how many characters total are in the longer string that we are comparing
+			// and then we want to iterate a maximum amount of indexes which is equal to the length of the shorter string so that we dont go out of bounds on the index of the shorter string
+			//and we check to see if exact character matches, and if they do we increase the match count, if there is a single mistake in the string then everything will be off by one and 
+			//the rest of the characters will be wrong, so we need to account for that
+
+
+			//AI needs harder question w/ regard to content, prompt needs to be rethought
 			async function handleSubmit(id, correctIndex, explanation, type, button) {
 				const wrapper = button.closest('.question');
 				const feedback = document.getElementById('feedback-' + id);
-				let isCorrect = false;
+				let isCorrect = false; //assume false why?
 
 				// Only handle multiple-choice questions
 				const selected = document.querySelector(\`input[name="q-\${id}"]:checked\`);
-				if (selected && parseInt(selected.value) === correctIndex) {
-					isCorrect = true;
+				if (selected && parseInt(selected.value) === correctIndex) { //this statement is evaluating accuracy... how??
+					isCorrect = true; 
 				}
-
+				//LOW PRI, non essential feature
 				let attempts = parseInt(wrapper.dataset.attempts || '0');
 				attempts++;
 				wrapper.dataset.attempts = attempts;
-
+				// validate correct? how is it done?
 				if (isCorrect) {
 					feedback.innerText = '✅ Correct!';
 					wrapper.style.borderColor = '#4CAF50';
 					wrapper.dataset.answered = 'true';
-					checkAllCorrect();
+					checkAllCorrect(); //what is utility of a secondary check correct function? This needs refactoring, should be a necessary branch of the normal isCorrect function, perhaps with some kind of object storage
 				} else {
 					feedback.innerText = '❌ Incorrect. Try again.';
 					wrapper.style.borderColor = '#e74c3c';
@@ -392,21 +353,21 @@ function getWebviewContent(): string {
 				}
 			}
 
-			function showHint(id, explanation) {
+			function showHint(id, explanation) { //non essential, and this utilizing another api call, perhaps worth including a hint generation in the first call....
 				const feedback = document.getElementById('feedback-' + id);
 				feedback.innerText = '💡 Hint: ' + explanation;
 			}
 
-			function checkAllCorrect() {
-				const questions = document.querySelectorAll('.question');
-				let allCorrect = true;
+			function checkAllCorrect() { //refactored.... utility
+				const questions = document.querySelectorAll('.question'); 
+				let allCorrect = true; // bro what? how do we know this is true? where? I see, assuming true and then trying to disprove it.... idk about that, seems dangerous
 				questions.forEach(q => {
 					if (q.dataset.answered !== 'true') {
 						allCorrect = false;
 					}
 				});
 				if (allCorrect) {
-					document.getElementById('congrats-button').style.display = 'inline-block';
+					document.getElementById('congrats-button').style.display = 'inline-block'; 
 				}
 			}
 
